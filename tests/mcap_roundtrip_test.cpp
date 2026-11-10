@@ -121,6 +121,40 @@ void test_unfinished_file(const std::filesystem::path& directory) {
           "destructor unexpectedly published a complete file");
 }
 
+void test_mcap_strings(const std::filesystem::path& directory) {
+  const auto path = directory / "utf8-test.mcap";
+  std::filesystem::remove(path);
+  robot_mcap::McapFile writer;
+  require(writer.open(path));
+  robot_mcap::ChannelId id = 0;
+  for (const auto* invalid : {"\x80", "\xc0\x80", "\xe0\x80\x80", "\xed\xa0\x80",
+                              "\xf4\x90\x80\x80", "\xe4\xb8"}) {
+    require(!writer.register_channel({invalid, "raw", std::nullopt}, id).ok(),
+            "invalid UTF-8 topic was accepted");
+  }
+  require(!writer.register_channel({"/raw", "\xff", std::nullopt}, id).ok(),
+          "invalid UTF-8 message encoding was accepted");
+  require(!writer.register_channel({"/raw", "raw", robot_mcap::SchemaSpec{"\xff", "raw", ""}},
+                                   id).ok(), "invalid UTF-8 schema name was accepted");
+  require(!writer.register_channel({"/raw", "raw", robot_mcap::SchemaSpec{"Raw", "\xff", ""}},
+                                   id).ok(), "invalid UTF-8 schema encoding was accepted");
+  require(writer.register_channel(
+      {u8"/\u6e29\u5ea6", "raw", robot_mcap::SchemaSpec{u8"\U0001f321", "raw", "\xff"}}, id));
+  require(id == 1, "invalid registrations consumed channel IDs");
+  require(writer.finish());
+}
+
+void test_embedded_nul_path(const std::filesystem::path& directory) {
+  const auto prefix = directory / "nul-test.mcap";
+  std::filesystem::remove(prefix);
+  auto invalid = prefix.native();
+  invalid.push_back(std::filesystem::path::value_type{});
+  invalid += std::filesystem::path(".unexpected").native();
+  robot_mcap::McapFile writer;
+  require(!writer.open(std::filesystem::path(invalid)).ok(), "embedded NUL in path was accepted");
+  require(!std::filesystem::exists(prefix), "writer created a file at the truncated path");
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -129,6 +163,8 @@ int main(int argc, char** argv) {
     test_roundtrip(argv[1]);
     test_existing_file(argv[1]);
     test_unfinished_file(argv[1]);
+    test_mcap_strings(argv[1]);
+    test_embedded_nul_path(argv[1]);
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';
     return 1;

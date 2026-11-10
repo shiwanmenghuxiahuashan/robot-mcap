@@ -14,3 +14,10 @@ CMake fetches the pinned Foxglove MCAP revision on the first build. Set
 `FETCHCONTENT_SOURCE_DIR_FOXGLOVE_MCAP` to an existing checkout of that
 revision for an offline build. The core currently writes indexed,
 uncompressed MCAP files without ROS or compression library dependencies.
+
+To inspect the round-trip fixture with the MCAP CLI (verified with v0.4.0):
+
+```sh
+mcap doctor build/core/roundtrip.mcap
+mcap list chunks build/core/roundtrip.mcap
+```

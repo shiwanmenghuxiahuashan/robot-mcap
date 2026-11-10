@@ -6,6 +6,7 @@
 #include <cerrno>
 #include <cstdio>
 #include <limits>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -73,6 +74,43 @@ bool same_schema(const std::optional<SchemaSpec>& first, const std::optional<Sch
          first->data == second->data;
 }
 
+bool valid_mcap_text(std::string_view value) {
+  if (value.empty() || value.size() > std::numeric_limits<std::uint32_t>::max()) {
+    return false;
+  }
+  for (std::size_t pos = 0; pos < value.size();) {
+    const auto lead = static_cast<unsigned char>(value[pos++]);
+    if (lead < 0x80) {
+      continue;
+    }
+    if (lead < 0xc2 || lead > 0xf4) {
+      return false;
+    }
+    std::size_t continuation = 1;
+    if (lead >= 0xf0) {
+      continuation = 3;
+    } else if (lead >= 0xe0) {
+      continuation = 2;
+    }
+    if (continuation > value.size() - pos) {
+      return false;
+    }
+    // Exclude overlong encodings, surrogate code points, and values above U+10FFFF.
+    const auto second = static_cast<unsigned char>(value[pos]);
+    if ((lead == 0xe0 && second < 0xa0) || (lead == 0xed && second >= 0xa0) ||
+        (lead == 0xf0 && second < 0x90) || (lead == 0xf4 && second >= 0x90)) {
+      return false;
+    }
+    for (std::size_t index = 0; index < continuation; ++index) {
+      const auto byte = static_cast<unsigned char>(value[pos++]);
+      if (byte < 0x80 || byte > 0xbf) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 }  // namespace
 
 struct McapFile::Impl {
@@ -114,6 +152,10 @@ Status McapFile::open(const std::filesystem::path& path, const FileOptions& opti
   if (path.empty() || options.chunk_size_bytes == 0) {
     return impl_->error("open", "output path and positive chunk size are required");
   }
+  if (path.native().find(std::filesystem::path::value_type{}) !=
+      std::filesystem::path::string_type::npos) {
+    return impl_->error("open", "output path contains an embedded NUL");
+  }
   try {
     impl_->output.open(path);
     impl_->used = true;
@@ -133,11 +175,8 @@ Status McapFile::register_channel(const ChannelSpec& spec, ChannelId& id) {
     return impl_->error("register_channel", "writer is not open");
   }
   constexpr auto max_field_size = std::numeric_limits<std::uint32_t>::max();
-  if (spec.topic.empty() || spec.message_encoding.empty() || spec.topic.size() > max_field_size ||
-      spec.message_encoding.size() > max_field_size ||
-      (spec.schema && (spec.schema->name.empty() || spec.schema->encoding.empty() ||
-                       spec.schema->name.size() > max_field_size ||
-                       spec.schema->encoding.size() > max_field_size ||
+  if (!valid_mcap_text(spec.topic) || !valid_mcap_text(spec.message_encoding) ||
+      (spec.schema && (!valid_mcap_text(spec.schema->name) || !valid_mcap_text(spec.schema->encoding) ||
                        spec.schema->data.size() > max_field_size))) {
     return impl_->error("register_channel", "invalid topic, encoding or schema");
   }
