@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "ruleset_version": "1",
+  "checks": [
+    {
+      "id": "source_missing_ratio",
+      "required": true,
+      "parameters": {
+        "topic": "/sensor/temperature",
+        "max_source_missing_ratio": 0.01
+      }
+    }
+  ]
+}

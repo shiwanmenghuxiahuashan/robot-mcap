@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "session_id": "03-ros2",
+  "state": "finalized",
+  "files": [
+    {
+      "path": "data_0000.mcap",
+      "state": "finalized",
+      "bytes": 1024,
+      "message_count": 2,
+      "first_log_time_ns": "1794326400000000000",
+      "last_log_time_ns": "1794326400100000000",
+      "timing": null
+    }
+  ],
+  "channels": [
+    {
+      "file_path": "data_0000.mcap",
+      "channel_id": 1,
+      "topic": "/sensor/count",
+      "message_encoding": "cdr",
+      "schema": {
+        "name": "std_msgs/msg/Int32",
+        "encoding": "ros2msg",
+        "sha256": "5c83541f45dbf6e688b3f3ad0b2b8cc7e5670f36b5c81eabbbf795ef216445e6"
+      },
+      "publish_time_policy": "log_time_only"
+    }
+  ],
+  "statistics": {
+    "accepted": 2,
+    "rejected": 0,
+    "writer_processed": 2,
+    "finalized_messages": 2
+  },
+  "durability": {
+    "requested_mode": "close",
+    "confirmation": "not_requested"
+  },
+  "ros2_replay": {
+    "state": "ready",
+    "metadata_path": "metadata.yaml"
+  },
+  "config_path": "recording-config.json",
+  "diagnostics": []
+}

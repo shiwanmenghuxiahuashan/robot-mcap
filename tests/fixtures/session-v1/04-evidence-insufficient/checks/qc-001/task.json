@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "session_id": "04-evidence-insufficient",
+  "run_id": "qc-001",
+  "manifest_path": "manifest.json",
+  "rules_path": "checks/qc-001/rules.json"
+}

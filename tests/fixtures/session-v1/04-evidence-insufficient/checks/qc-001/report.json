@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "session_id": "04-evidence-insufficient",
+  "run_id": "qc-001",
+  "manifest_path": "manifest.json",
+  "ruleset_version": "1",
+  "tool_version": "fixture",
+  "overall": "undetermined",
+  "checks": [
+    {
+      "id": "source_missing_ratio",
+      "rule_version": "1",
+      "target": "/sensor/temperature",
+      "parameters": {
+        "topic": "/sensor/temperature",
+        "max_source_missing_ratio": 0.01
+      },
+      "time_basis": "source_counter",
+      "status": "insufficient_evidence",
+      "metrics": {
+        "recorded_count": 2,
+        "expected_source_count": null,
+        "missing_ratio": null
+      },
+      "evidence": [],
+      "reason": "missing_trusted_source_count"
+    }
+  ]
+}

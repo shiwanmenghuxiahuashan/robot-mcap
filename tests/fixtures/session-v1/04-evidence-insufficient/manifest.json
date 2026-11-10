@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "session_id": "04-evidence-insufficient",
+  "state": "finalized",
+  "files": [
+    {
+      "path": "data_0000.mcap",
+      "state": "finalized",
+      "bytes": 1024,
+      "message_count": 2,
+      "first_log_time_ns": "1794326400000000000",
+      "last_log_time_ns": "1794326400100000000",
+      "timing": null
+    }
+  ],
+  "channels": [
+    {
+      "file_path": "data_0000.mcap",
+      "channel_id": 1,
+      "topic": "/sensor/temperature",
+      "message_encoding": "json",
+      "schema": {
+        "name": "Temperature",
+        "encoding": "jsonschema",
+        "sha256": "24be6de44cb81cdb990b88cbdec9445a07556de6650cda94ace06874969a41a3"
+      },
+      "publish_time_policy": "log_time_only"
+    }
+  ],
+  "statistics": {
+    "accepted": 2,
+    "rejected": 0,
+    "writer_processed": 2,
+    "finalized_messages": 2
+  },
+  "durability": {
+    "requested_mode": "close",
+    "confirmation": "not_requested"
+  },
+  "ros2_replay": {
+    "state": "not_requested",
+    "metadata_path": null
+  },
+  "config_path": "recording-config.json",
+  "diagnostics": []
+}

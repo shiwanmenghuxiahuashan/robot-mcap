@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "session_id": "02-partial",
+  "state": "failed",
+  "files": [
+    {
+      "path": "data_0000.mcap.partial",
+      "state": "partial",
+      "bytes": 288,
+      "message_count": null,
+      "first_log_time_ns": null,
+      "last_log_time_ns": null,
+      "timing": null
+    }
+  ],
+  "channels": [
+    {
+      "file_path": "data_0000.mcap.partial",
+      "channel_id": 1,
+      "topic": "/sensor/bytes",
+      "message_encoding": "raw",
+      "schema": null,
+      "publish_time_policy": "log_time_only"
+    }
+  ],
+  "statistics": {
+    "accepted": 3,
+    "rejected": 1,
+    "writer_processed": 1,
+    "finalized_messages": null
+  },
+  "durability": {
+    "requested_mode": "close",
+    "confirmation": "not_requested"
+  },
+  "ros2_replay": {
+    "state": "not_requested",
+    "metadata_path": null
+  },
+  "config_path": "recording-config.json",
+  "diagnostics": [
+    {
+      "code": "writer_io_error",
+      "severity": "error",
+      "topic": null,
+      "log_time_ns": "1794326400100000000",
+      "detail": "No space left on device",
+      "action": "retain_partial_and_reject_new_messages"
+    }
+  ]
+}

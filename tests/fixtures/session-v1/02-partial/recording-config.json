@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "session_id": "02-partial",
+  "writer": {
+    "version": "fixture",
+    "profile": "",
+    "chunk_size_bytes": 1048576,
+    "compression": "none",
+    "chunk_crc": true,
+    "chunking": true,
+    "message_index": true,
+    "chunk_index": true,
+    "summary": true,
+    "rotate": false
+  },
+  "durability_mode": "close",
+  "adapter": null
+}
