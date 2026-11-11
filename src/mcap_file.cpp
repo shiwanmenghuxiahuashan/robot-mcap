@@ -1,69 +1,57 @@
 #include "robot_mcap/mcap_file.hpp"
 
+#include "robot_mcap/io.hpp"
+
+#include "text.hpp"
+
 #include <mcap/writer.hpp>
 
 #include <algorithm>
-#include <cerrno>
-#include <cstdio>
 #include <limits>
+#include <memory>
 #include <string_view>
-#include <system_error>
 #include <utility>
 #include <vector>
 
 namespace robot_mcap {
 namespace {
 
-class FileOutput final : public mcap::IWritable {
+// Adapts the generic byte sink to the upstream writer interface.
+class SinkWritable final : public mcap::IWritable {
 public:
-  ~FileOutput() override { abandon(); }
+  explicit SinkWritable(std::unique_ptr<OutputSink> sink) : sink_(std::move(sink)) {}
+  ~SinkWritable() override { abandon(); }
 
-  void open(const std::filesystem::path& path) {
-#ifdef _WIN32
-    const int error = _wfopen_s(&file_, path.c_str(), L"wbx");
-#else
-    file_ = std::fopen(path.c_str(), "wbx");
-    const int error = file_ ? 0 : errno;
-#endif
-    if (!file_) {
-      throw std::system_error(error, std::generic_category(), "create output");
-    }
-  }
+  SinkWritable(const SinkWritable&) = delete;
+  SinkWritable& operator=(const SinkWritable&) = delete;
 
-  void flush() override {
-    if (std::fflush(file_) != 0) {
-      throw std::system_error(errno, std::generic_category(), "flush output");
-    }
-  }
-
+  void flush() override { sink_->flush(); }
   void end() override {
-    if (std::fclose(std::exchange(file_, nullptr)) != 0) {
-      throw std::system_error(errno, std::generic_category(), "close output");
-    }
+    sink_->close();
+    closed_ = true;
   }
-
-  std::uint64_t size() const override { return size_; }
+  std::uint64_t size() const override { return sink_->size(); }
 
   void abandon() noexcept {
-    if (file_) {
-      std::fclose(std::exchange(file_, nullptr));
+    if (!closed_ && sink_) {
+      sink_->abandon();
     }
   }
 
 protected:
   void handleWrite(const std::byte* data, std::uint64_t size) override {
-    if (size == 0) {
-      return;
+    while (size > 0) {
+      const auto chunk = static_cast<std::size_t>(
+          std::min<std::uint64_t>(size, std::numeric_limits<std::size_t>::max()));
+      sink_->write(data, chunk);
+      data += chunk;
+      size -= chunk;
     }
-    if (std::fwrite(data, 1, static_cast<std::size_t>(size), file_) != size) {
-      throw std::system_error(errno, std::generic_category(), "write output");
-    }
-    size_ += size;
   }
 
 private:
-  std::FILE* file_ = nullptr;
-  std::uint64_t size_ = 0;
+  std::unique_ptr<OutputSink> sink_;
+  bool closed_ = false;
 };
 
 bool same_schema(const std::optional<SchemaSpec>& first, const std::optional<SchemaSpec>& second) {
@@ -75,47 +63,15 @@ bool same_schema(const std::optional<SchemaSpec>& first, const std::optional<Sch
 }
 
 bool valid_mcap_text(std::string_view value) {
-  if (value.empty() || value.size() > std::numeric_limits<std::uint32_t>::max()) {
-    return false;
-  }
-  for (std::size_t pos = 0; pos < value.size();) {
-    const auto lead = static_cast<unsigned char>(value[pos++]);
-    if (lead < 0x80) {
-      continue;
-    }
-    if (lead < 0xc2 || lead > 0xf4) {
-      return false;
-    }
-    std::size_t continuation = 1;
-    if (lead >= 0xf0) {
-      continuation = 3;
-    } else if (lead >= 0xe0) {
-      continuation = 2;
-    }
-    if (continuation > value.size() - pos) {
-      return false;
-    }
-    // Exclude overlong encodings, surrogate code points, and values above U+10FFFF.
-    const auto second = static_cast<unsigned char>(value[pos]);
-    if ((lead == 0xe0 && second < 0xa0) || (lead == 0xed && second >= 0xa0) ||
-        (lead == 0xf0 && second < 0x90) || (lead == 0xf4 && second >= 0x90)) {
-      return false;
-    }
-    for (std::size_t index = 0; index < continuation; ++index) {
-      const auto byte = static_cast<unsigned char>(value[pos++]);
-      if (byte < 0x80 || byte > 0xbf) {
-        return false;
-      }
-    }
-  }
-  return true;
+  return !value.empty() && value.size() <= std::numeric_limits<std::uint32_t>::max() &&
+         detail::valid_utf8(value);
 }
 
 }  // namespace
 
 struct McapFile::Impl {
   std::filesystem::path path;
-  FileOutput output;
+  std::unique_ptr<SinkWritable> output;
   mcap::McapWriter writer;
   std::vector<ChannelSpec> channels;
   bool used = false;
@@ -127,7 +83,9 @@ struct McapFile::Impl {
 
   void abandon() noexcept {
     writer.terminate();
-    output.abandon();
+    if (output) {
+      output->abandon();
+    }
     open = false;
   }
 
@@ -157,12 +115,14 @@ Status McapFile::open(const std::filesystem::path& path, const FileOptions& opti
     return impl_->error("open", "output path contains an embedded NUL");
   }
   try {
-    impl_->output.open(path);
+    const auto file_system = options.file_system ? options.file_system : native_file_system();
+    impl_->output =
+        std::make_unique<SinkWritable>(file_system->create_exclusive(path));
     impl_->used = true;
     mcap::McapWriterOptions writer_options("");
     writer_options.chunkSize = options.chunk_size_bytes;
     writer_options.compression = mcap::Compression::None;
-    impl_->writer.open(impl_->output, writer_options);
+    impl_->writer.open(*impl_->output, writer_options);
     impl_->open = true;
     return {};
   } catch (const std::exception& error) {
@@ -248,5 +208,7 @@ Status McapFile::finish() {
     return impl_->fail("finish", error.what());
   }
 }
+
+bool McapFile::is_open() const noexcept { return impl_->open; }
 
 }  // namespace robot_mcap

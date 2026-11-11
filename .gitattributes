@@ -1,0 +1,4 @@
+# The session contract requires LF-terminated NDJSON and stable JSON fixture bytes.
+*.ndjson text eol=lf
+*.json text eol=lf
+*.mcap binary

@@ -61,10 +61,10 @@
 
 **接口候选**　`Recorder::start()`、`register_channel(ChannelSpec)`、`submit_copy(ChannelId, MessageView)`、`submit_owned(ChannelId, OwnedMessage)`、`stop_async()` 返回共享的停止结果，`stop()` 等待同一结果。
 
-- [ ] 新增 `recorder_lifecycle` 测试。用屏障而非延时固定队列满、停止与提交竞争、写入／关闭／同步失败、两实例互不影响。复制入口覆盖调用者立即复用输入，所有权入口覆盖停止前缓冲保持有效。
-- [ ] 运行测试并确认因尚未实现队列与收尾而失败。
-- [ ] 将状态、接收边界、通道注册和队列预算纳入同一同步协议。写入线程按队列顺序调用任务 1 接口。按任务 0 发布产物与统计。用可注入文件操作覆盖 I/O 故障。
-- [ ] 重跑 `ctest --test-dir build/core -R 'mcap_roundtrip|recorder_lifecycle' --output-on-failure`。核对成功录制的消息数与读取器结果，故障下分别核对接收、拒绝、写入和部分产物。
+- [x] 新增 `recorder_lifecycle` 测试。用屏障而非延时固定队列满、停止与提交竞争、写入／关闭／同步失败、两实例互不影响。复制入口覆盖调用者立即复用输入，所有权入口覆盖停止前缓冲保持有效。
+- [x] 运行测试并确认因尚未实现队列与收尾而失败。
+- [x] 将状态、接收边界、通道注册和队列预算纳入同一同步协议。写入线程按队列顺序调用任务 1 接口。按任务 0 发布产物与统计。用可注入文件操作覆盖 I/O 故障。
+- [x] 重跑 `ctest --test-dir build/core -R 'mcap_roundtrip|recorder_lifecycle' --output-on-failure`。核对成功录制的消息数与读取器结果，故障下分别核对接收、拒绝、写入和部分产物。
 
 ## 任务 3：实现插件运行时和录制流程
 

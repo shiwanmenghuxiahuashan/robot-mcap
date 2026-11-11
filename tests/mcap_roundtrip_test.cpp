@@ -50,13 +50,13 @@ void test_roundtrip(const std::filesystem::path& directory) {
   constexpr std::uint64_t log_time = 1794326400000000000ULL;
   constexpr std::uint64_t publish_time = 1794326399999999999ULL;
   const auto* data = reinterpret_cast<const std::byte*>(payload.data());
-  require(!writer.write(temperature_id, {log_time, std::nullopt, data, payload.size()}).ok(),
+  require(!writer.write(temperature_id, {log_time, std::nullopt, data, payload.size(), 0, std::nullopt}).ok(),
           "source-required channel accepted missing publish time");
-  require(writer.write(temperature_id, {log_time, publish_time, data, payload.size(), 42}));
+  require(writer.write(temperature_id, {log_time, publish_time, data, payload.size(), 42, std::nullopt}));
   const std::array raw{std::byte{0x00}, std::byte{0xff}};
-  require(!writer.write(raw_id, {log_time + 1, publish_time, raw.data(), raw.size()}).ok(),
+  require(!writer.write(raw_id, {log_time + 1, publish_time, raw.data(), raw.size(), 0, std::nullopt}).ok(),
           "log-only channel accepted source publish time");
-  require(writer.write(raw_id, {log_time + 1, std::nullopt, raw.data(), raw.size()}));
+  require(writer.write(raw_id, {log_time + 1, std::nullopt, raw.data(), raw.size(), 0, std::nullopt}));
   require(writer.finish());
 
   mcap::McapReader reader;
@@ -111,9 +111,9 @@ void test_unfinished_file(const std::filesystem::path& directory) {
     require(writer.open(path));
     robot_mcap::ChannelId id = 0;
     require(writer.register_channel({"/unfinished", "raw", std::nullopt}, id));
-    require(!writer.write(id, {42, std::nullopt, nullptr, 1}).ok(),
+    require(!writer.write(id, {42, std::nullopt, nullptr, 1, 0, std::nullopt}).ok(),
             "null payload with a nonzero length was accepted");
-    require(writer.write(id, {42, std::nullopt, nullptr, 0}));
+    require(writer.write(id, {42, std::nullopt, nullptr, 0, 0, std::nullopt}));
   }
   mcap::McapReader reader;
   require(!reader.open(path.string()).ok() ||
