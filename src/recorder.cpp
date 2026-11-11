@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -703,6 +704,16 @@ Recorder::Recorder(RecorderOptions options)
 Recorder::~Recorder() = default;
 
 Status Recorder::start() { return impl_->start(); }
+
+std::filesystem::path Recorder::parent_directory() const {
+  std::lock_guard lock(impl_->mutex);
+  if (!impl_->session_directory.empty()) {
+    return impl_->session_directory.parent_path();
+  }
+  std::error_code error;
+  const auto absolute = std::filesystem::absolute(impl_->options.parent_directory, error);
+  return error ? impl_->options.parent_directory : absolute;
+}
 
 Status Recorder::register_channel(const ChannelSpec& spec, ChannelId& id) {
   return impl_->register_channel(spec, id);

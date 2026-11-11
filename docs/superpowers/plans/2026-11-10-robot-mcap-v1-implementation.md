@@ -72,9 +72,9 @@
 
 **接口候选**　`IPlugin::apply(Context&, Scope&)`、带版本的服务描述、`IRecordingSink`、`IPrecheck::run(const StartContext&)`。宿主注入固定核心。热路径直接调用已解析的 sink。
 
-- [ ] 新增 `plugin_runtime` 测试。覆盖缺依赖、重复提供者、版本不符、循环、中途失败、在途回调、跨实例隔离和未请求后校验。用测试插件验证卸载前停止生产、等待回调、收尾、释放缓冲及服务引用的顺序。
-- [ ] 实现静态配置驱动的装配、依赖排序、类型检查和作用域清理。先用内置工厂跑通，再验证同工具链构建的原生模块从启动到关停的生命周期。基础门禁负责输出可写和空间阈值，并允许 ROS 插件注册附加检查。
-- [ ] 运行 `ctest --test-dir build/core -R 'plugin_runtime|recorder_lifecycle' --output-on-failure`。确认无插件方式仍可完成核心录制。
+- [x] 新增 `plugin_runtime` 测试。覆盖缺依赖、重复提供者、版本不符、循环、中途失败、在途回调、跨实例隔离和未请求后校验。用测试插件验证卸载前停止生产、等待回调、收尾、释放缓冲及服务引用的顺序。
+- [x] 实现静态配置驱动的装配、依赖排序、类型检查和作用域清理。先用内置工厂跑通，再验证同工具链构建的原生模块从启动到关停的生命周期。基础门禁负责输出可写和空间阈值，并允许 ROS 插件注册附加检查。
+- [x] 运行 `ctest --test-dir build/core -R 'plugin_runtime|recorder_lifecycle' --output-on-failure`。确认无插件方式仍可完成核心录制。
 
 ## 任务 4：实现 ROS 2 Jazzy 录制与实际回放
 

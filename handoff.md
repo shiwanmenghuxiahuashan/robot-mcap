@@ -1,11 +1,11 @@
 # Robot MCAP 开发交接
 
-交接日期为 2026 年 11 月 11 日。**任务 2 已在工作树完成并通过 WSL 验证；从任务 3 接手。**
+交接日期为 2026 年 11 月 11 日。**任务 2 已提交，任务 3 已在工作树完成并通过验证；从任务 4 接手。**
 
 ## 仓库和分支
 
 - 主仓库在 `D:/dev/robot-mcap`。GitHub 远端为 [shiwanmenghuxiahuashan/robot-mcap](https://github.com/shiwanmenghuxiahuashan/robot-mcap)。
-- 任务 2 的实现基于 `9341eef40bc61089fd3e2cb7c680ca32747c2782`（本地 `main` 与 `origin/main` 在该提交一致）。**这些改动仍在工作树中，尚未提交**，请勿覆盖或重置。
+- 任务 2 已提交为 `ca238da`（分支 `feature/task-2-recorder`），基于 `9341eef`。任务 3 的改动在 `feature/task-3-plugin-runtime` 的**工作树中，尚未提交**，请勿覆盖。
 - 本机验证环境为 Ubuntu 22.04 WSL、GCC 11.4、CMake 3.22；Windows 原生构建仍未验证。
 
 ## 已有交付
@@ -13,34 +13,34 @@
 | 范围 | 状态 |
 | --- | --- |
 | 任务 0 | v1 落盘契约和四组文本夹具 |
-| 任务 1 | 独立 C++17 写入器与读回测试，含 UTF-8 和路径校验 |
-| 任务 2 | **已完成（工作树）**：录制会话、有界异步队列、收尾、时间旁路、失败矩阵和生命周期测试 |
-| 任务 3–6 | 插件运行时、Jazzy 录制回放、独立后校验、性能验证 |
+| 任务 1 | 独立 C++17 写入器与读回测试 |
+| 任务 2 | **已提交**：录制会话、有界队列、收尾、时间旁路、失败矩阵和生命周期测试 |
+| 任务 3 | **已完成（工作树）**：服务注册表、依赖解析、插件作用域、录制流程、前置门禁、原生模块和测试 |
+| 任务 4–6 | Jazzy 录制回放、独立后校验、性能验证 |
 
-## 任务 2 交付
+## 任务 3 交付
 
 新增或修改的文件：
 
-- `include/robot_mcap/recorder.hpp`：`Recorder`、`RecorderOptions`、`OwnedMessage`、`SubmitResult`、`StopResult`。
-- `include/robot_mcap/io.hpp`、`src/io.cpp`：`OutputSink` 和 `FileSystem` 可注入 I/O 接口及原生实现。
-- `src/recorder.cpp`：状态机、有界队列、写入线程、停止结果和失败收尾。
-- `src/session_artifacts.{hpp,cpp}`：会话目录、配置快照、时间旁路、清单发布、同步和 SHA-256 使用。
-- `src/sha256.{hpp,cpp}`、`src/text.{hpp,cpp}`：内部哈希与 UTF-8 校验。
-- `tests/recorder_lifecycle_test.cpp`：屏障/门控故障注入和契约断言。
-- `CMakeLists.txt`、`README.md`、`tests/mcap_roundtrip_test.cpp`：构建、文档和新增字段的初始化修正。
+- `include/robot_mcap/plugin_runtime.hpp`、`src/plugin_runtime.cpp`：版本化服务描述、`Context`/`Scope`/`RegistrationHandle`、`IPlugin`、`PluginRuntime`、原生模块 C ABI。
+- `include/robot_mcap/recording_flow.hpp`、`src/recording_flow.cpp`：`IRecordingSink`/`IMessageSink`、`CoreRecordingSink`、`IRecordingStatus`、`IPrecheck`/`IPrecheckRegistry`、`RecordingFlow`、`RecordingFlowPlugin`。
+- `include/robot_mcap/recorder.hpp`、`src/recorder.cpp`：新增 `Recorder::parent_directory()`，供前置门禁校验目标目录。
+- `tests/plugin_runtime_test.cpp`、`tests/plugin_test_module.cpp`、`tests/plugin_test_support.hpp`：内置插件和同工具链原生模块测试。
+- `CMakeLists.txt`：新增库源文件、`POSITION_INDEPENDENT_CODE`、`${CMAKE_DL_LIBS}`、测试模块和 `plugin_runtime` 目标。
+- `README.md`、实施计划任务 3 勾选。
 
 已实现的关键语义：
 
-1. `start()` 独占创建 `<parent>/<session_id>`，写入配置快照，打开 `data_0000.mcap.partial`，启动单一写入线程。会话 ID 按契约校验；启动失败尽量清理本次创建的目录和文件。
-2. 队列按 **载荷字节** 有界。`submit_copy` 在返回前复制；`submit_owned` 接收右值，仅在成功时转移所有权。队列满或单条超过预算立即返回 `QueueFull`。
-3. `stop_async()` 同步停止接收并返回共享 future；`stop()` 等待同一结果。停止边界前已接收的消息由写入线程排空并写入；故障路径丢弃排队消息并拒绝后续提交。写入失败会自动收尾，`stop_async()` 可在不调用 `stop()` 时观察结果；析构函数会停止并 join。
-4. 成功时 `data_0000.mcap.partial` 和可选的 `data_0000.timing.ndjson.partial` 重命名为最终文件，清单通过临时文件发布。失败时保留 `.partial` 和已知产物，并尽力发布失败清单。
-5. 失败矩阵分别表达：MCAP 写入/关闭失败（文件 partial、最终消息数 null）；MCAP 完成但时间旁路失败（文件 finalized、会话 failed、`finalized_messages` 为已知的 `writer_processed`、timing state 为 partial/unknown）；仅同步失败（文件 finalized、durability failed）；清单发布失败（数据仍可读，stop 返回错误）。
-6. 时间旁路按契约生成稀疏行（`source_clock` 存在，或通道策略为 `per_message` 且缺少发布时间）。`message_ordinal` 统计成功写入的物理 Message，跨通道递增；序号 2 没有行时后续行仍使用 3/4。行格式与 `tests/fixtures/session-v1/01-finalized/data_0000.timing.ndjson` **逐字节一致**，清单中的 sha256 与夹具一致。
-7. `DurabilityMode::Sync` 在清单改名之前同步数据、时间旁路、配置和清单临时文件；之后同步会话目录和父目录。创建会话目录时即尝试同步父目录。任何要求的同步失败都会使同步模式 stop 失败，但已完成的 MCAP 仍可读。
-8. `StopResult.reason` 区分 `Requested`、`WriterFailure`、`TimingFailure`、`PublishFailure`、`StartFailure`、`NotStarted`；`file_state` 与 `durability_state` 独立表达。
+1. **装配与依赖**：一个 `PluginRuntime` 对应一个实例。宿主先绑定服务、注册工厂/原生模块，再调用 `start(plugin_ids)`。启动前检查缺工厂、重复选择、描述符非法、缺必需依赖、重复提供者、版本不满足和依赖循环；错误包含插件/服务名。插件按依赖拓扑排序，选择顺序只用于同层稳定排序。
+2. **两阶段启动**：所有插件先按拓扑顺序 `apply()`，每个提供者的声明服务在依赖者应用前验证；全部 apply 成功后再按同一顺序 `activate()`。源插件在 activate 中注册通道并开始提交，确保录制流程已经通过门禁并启动核心。
+3. **服务与作用域**：服务 ID 由 `service_id<T>()`（实现相关的 `typeid(T).name()`）生成，带名称和版本；同一 ID 只允许一个提供者。`Context::provide<T>()` 返回 RAII `RegistrationHandle`，必须由插件 `Scope::own()` 持有。`Scope` 记录 stop/wait/finalize/cleanup 动作和注册句柄；运行时按**逆初始化顺序**执行所有 stop、所有 wait、所有 finalize、所有 cleanup/句柄释放。回调不持有运行时锁，异常被收集且后续动作继续执行。
+4. **回滚**：apply/activate 失败时，运行时对已应用和失败的插件执行完整四阶段清理，强制撤销插件提供但未由 Scope 释放的服务，销毁所有插件对象后再卸载模块；注册句柄幂等，支持“提供后抛异常”的半初始化插件。
+5. **录制流程**：`RecordingFlow` 由宿主持有，`RecordingFlowPlugin` 在 apply 中取得 `IRecordingSink`、校验前置目录、提供 `IMessageSink`/`IPrecheckRegistry`/`IRecordingStatus`，在 activate 中运行门禁并启动核心，在 finalize 中停止核心；stop 释放 sink 引用和插件预检，避免宿主持有的 flow 在模块卸载后仍访问原生物件。`FlowStartState`、`start_error`、`prechecks` 和可空 `stop` 分别表达启动结果与核心收尾结果；未配置后校验时 `post_check` 为 `NotRequested`。门禁运行时不持有 flow 锁，预检可安全读取 `IRecordingStatus::result()`。
+6. **前置门禁**：`RecordingFlow` 构造时注册输出目录可写和剩余空间阈值检查；`attach_sink` 校验 `StartContext.output_directory` 与 `IRecordingSink::output_directory()` 一致。其他插件可在 apply 中通过 `IPrecheckRegistry` 追加检查；检查注册表在首次运行后关闭，重复名称和运行后追加会被拒绝，检查异常转为命名失败结果。
+7. **能力拆分**：数据源只取得 `IMessageSink`（注册通道、提交消息），不能启动/停止核心；`IRecordingSink`（start/stop/输出目录）只提供给录制流程插件。`CoreRecordingSink` 持有 `shared_ptr<Recorder>`，保证生命周期。
+8. **原生模块**：模块导出 `robot_mcap_plugin_module_v1`（ABI 1），提供 `plugin_id`、create/destroy；运行时用 `dlopen`/`LoadLibraryW` 加载，校验 ABI，工厂 deleter 持有模块直到插件销毁，插件对象全部销毁后才卸载。模块必须与宿主使用相同工具链和头文件（Q16）。
 
-测试覆盖：正常/空会话、队列满、停止竞争、门控写入期间停止、复制缓冲复用、所有权拒绝时保留、写入/关闭/时间旁路/清单/同步失败、两实例隔离和失败隔离、并发注册、同 ID 并发启动、启动失败清理、乱序 log_time、零长度载荷、未使用通道、时间旁路 golden 字节和统计冻结。
+测试覆盖：缺依赖、重复提供者、版本不符、循环、缺工厂、工厂返回空、describe 抛异常、中途 apply 失败与回滚、回滚中的线程 join 和下游插件抑制、activate 失败、stop 动作抛异常仍继续 wait/finalize/cleanup、句柄在 cleanup 中重置、在途线程 join 屏障、跨实例隔离与失败隔离、可选依赖缺失/旧版本、宿主服务重复/空/版本/启动后绑定、预检重复/异常/关闭后追加、预检重入读取状态、预检失败不启动核心、核心 start 失败不调用 stop、源插件先选择但流程仍先启动、finalize 阶段提交最后一条消息并被核心排空、无插件核心录制、原生模块加载/坏 ABI/服务生命周期/双实例。
 
 ## 验证记录
 
@@ -53,28 +53,29 @@ cmake --build build/core -j 2
 ctest --test-dir build/core --output-on-failure
 ```
 
-结果：`mcap_roundtrip` 与 `recorder_lifecycle` **2/2 通过**。另完成：
+结果：`mcap_roundtrip`、`recorder_lifecycle`、`plugin_runtime` **3/3 通过**；`plugin_runtime` 连续 10 次通过。另完成：
 
-- ThreadSanitizer（`setarch $(uname -m) -R` 规避 WSL 内存布局）无报告。
+- ThreadSanitizer（`setarch $(uname -m) -R`）无报告。
 - AddressSanitizer + UBSan 无报告。
 - `-Wall -Wextra -Wpedantic -Werror` 构建通过。
 
 ## 复核留项
 
-- 时间旁路的 ordinal/物理顺序保证仅对 finalized 文件成立；partial 文件只用于显式诊断，普通检查不消费。
-- `recording-config.json` 目前直接记录写入器固定设置（profile 为空、无压缩、CRC/索引/摘要开启）。任务 4 引入 ROS profile 时，应让 `McapFile` 的有效设置成为配置快照的单一来源。
-- 队列预算按队等待载荷字节计算，写入中的一条消息不计入，因此内存上界为预算加一条在途消息。零长度消息不受消息计数上限约束。
-- `UINT64_MAX` 时间戳的上游索引边界仍是后续边界用例；`log_time = 0` 已覆盖。
-- Windows 目录同步使用 `FlushFileBuffers`，不支持的卷会返回失败；Windows 构建和 `ros2` 目标尚未在目标环境验证。
-- Windows 保留设备名（如 `con`）通过会话 ID 语法校验，但目录创建会失败；如需可加显式拒绝。
-- 当前 API 没有独立的 `termination()`；写入故障后调用 `stop_async()` 即可等待自主收尾结果。
+- 任务 4 的 ROS 插件需要通过 `IPrecheckRegistry` 注册必需 topic/类型检查，并通过 `IMessageSink` 提交 CDR 载荷。
+- 任务 5 的后校验会扩展 `PostCheckState`；当前只有 `NotRequested`。
+- 在 `PluginRuntime` 模式下停止必须走 `PluginRuntime::stop()`；`RecordingFlow::stop()` 只用于无运行时核心录制或流程插件 finalize。
+- 运行时是一次性的：失败或停止后不能重新 `start()`；需要重新录制请新建 Recorder/Flow/Runtime。
+- 核心启动后、后续插件 activate 失败时，回滚会停止核心并留下一个干净 finalized 的空会话；运行时 start 同时返回失败。调用方应同时检查两者。
+- 原生模块 ABI 不承诺长期二进制兼容；同工具链/头文件是 v1 前提。
+- 前置门禁使用原生文件系统探测（未走 `FileSystem` 注入），空间阈值边界当前用超大阈值和不可写路径验证。
+- Windows 原生模块加载和目录同步仍未在目标环境验证。
 
-## 任务 3 接手点
+## 任务 4 接手点
 
-1. 先写 `plugin_runtime` 测试，覆盖缺依赖、重复提供者、版本不符、循环、中途失败、在途回调、跨实例隔离和未请求后校验；使用屏障固定卸载顺序。
-2. 实现 `IPlugin::apply(Context&, Scope&)`、带版本的服务描述、`IRecordingSink` 和 `IPrecheck::run(const StartContext&)`；宿主注入任务 2 的 `Recorder`。热路径直接调用已解析的 sink。
-3. 基础门禁检查输出可写和空间阈值，允许 ROS 插件注册附加检查；插件卸载前停止生产、等待回调、收尾、释放缓冲和服务引用。
-4. 运行 `ctest --test-dir build/core -R 'plugin_runtime|recorder_lifecycle' --output-on-failure`，确认无插件方式仍可完成核心录制。
+1. 新增 `plugins/ros2_jazzy/CMakeLists.txt`、`ros2_source.cpp`、`bag_metadata.cpp`、`tests/ros2_jazzy/record_replay_test.cpp`；使用 Jazzy 类型与工具链构建。
+2. ROS 数据源插件声明依赖 `IMessageSink` 与 `IRecordingStatus`，在 `activate()` 中按配置发现并订阅选中序列化 topic，保留原始 CDR 和真实时间；晚出现、类型/定义变化、QoS 覆盖和必需 topic 门禁按 Q19 处理，诊断进入会话记录。
+3. 适配层用 Jazzy 元数据 API 生成与实际 MCAP 和统计一致的 `metadata.yaml`；元数据生成失败可见，已完成 MCAP 仍可独立读取。
+4. 测试先建立独立订阅端和发现条件，再发布已知消息流；录完执行 `ros2 bag info`、`ros2 bag play`，核对数量、类型和载荷。运行 `ctest --test-dir build/jazzy -R '^ros2_record_replay$' --output-on-failure`。
 5. 同步更新 README 和本交接文件。
 
-阅读入口：[实施计划的任务 3](<D:/dev/robot-mcap/docs/superpowers/plans/2026-11-10-robot-mcap-v1-implementation.md:69>) · [会话落盘契约](<D:/dev/robot-mcap/docs/contracts/session-v1.md>) · [Recorder 接口](<D:/dev/robot-mcap/include/robot_mcap/recorder.hpp>) · [生命周期测试](<D:/dev/robot-mcap/tests/recorder_lifecycle_test.cpp>)
+阅读入口：[实施计划的任务 4](<D:/dev/robot-mcap/docs/superpowers/plans/2026-11-10-robot-mcap-v1-implementation.md:79>) · [会话落盘契约](<D:/dev/robot-mcap/docs/contracts/session-v1.md>) · [插件运行时接口](<D:/dev/robot-mcap/include/robot_mcap/plugin_runtime.hpp>) · [录制流程接口](<D:/dev/robot-mcap/include/robot_mcap/recording_flow.hpp>) · [插件测试](<D:/dev/robot-mcap/tests/plugin_runtime_test.cpp>)

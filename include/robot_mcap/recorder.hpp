@@ -93,6 +93,9 @@ public:
   Recorder& operator=(const Recorder&) = delete;
 
   Status start();
+  // The absolute parent directory used for the session. Before start(), this is the
+  // resolved parent_directory option.
+  std::filesystem::path parent_directory() const;
   Status register_channel(const ChannelSpec& spec, ChannelId& id);
   SubmitResult submit_copy(ChannelId channel, MessageView message);
   // Ownership transfers only when the result is accepted. On rejection the caller's
