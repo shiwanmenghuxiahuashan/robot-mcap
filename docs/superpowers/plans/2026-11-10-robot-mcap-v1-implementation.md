@@ -82,10 +82,10 @@
 
 **接口**　源插件调用 `IRecordingSink`，ROS 适配层负责消息定义、QoS 和回放元数据。使用 Jazzy 类型与工具链构建。
 
-- [ ] 新增 `ros2_record_replay` 测试。发布一个已知消息流，覆盖必需 topic 缺失、选择范围外 topic、允许晚出现和类型冲突。录完执行 `ros2 bag info`、`ros2 bag play`，用独立订阅端核对数量、类型和载荷。回放测试先建立订阅和发现条件，避免把测试自身的启动竞争当成丢包。
-- [ ] 按配置发现并订阅选中的序列化 topic，接入 QoS 覆盖与类型支持门禁。保留字节和真实可取得的时间信息。记录晚出现与类型冲突，拒绝不兼容消息。
-- [ ] 在适配层生成与实际 MCAP 文件和统计相符的 Jazzy 元数据。模拟元数据生成失败，验证错误可见且已完成 MCAP 可独立读取。
-- [ ] 在已加载 Jazzy 环境的构建中运行 `ctest --test-dir build/jazzy -R '^ros2_record_replay$' --output-on-failure`，保存真实订阅证据。
+- [x] 新增 `ros2_record_replay` 测试。发布一个已知消息流，覆盖必需 topic 缺失、选择范围外 topic、允许晚出现和类型冲突。录完执行 `ros2 bag info`、`ros2 bag play`，用独立订阅端核对数量、类型和载荷。回放测试先建立订阅和发现条件，避免把测试自身的启动竞争当成丢包。
+- [x] 按配置发现并订阅选中的序列化 topic，接入 QoS 覆盖与类型支持门禁。保留字节和真实可取得的时间信息。记录晚出现与类型冲突，拒绝不兼容消息。
+- [x] 在适配层生成与实际 MCAP 文件和统计相符的 Jazzy 元数据。模拟元数据生成失败，验证错误可见且已完成 MCAP 可独立读取。
+- [x] 在已加载 Jazzy 环境的构建中运行 `ctest --test-dir build/jazzy -R '^ros2_record_replay$' --output-on-failure`，保存真实订阅证据。
 
 ## 任务 5：实现独立后校验和版本化报告
 

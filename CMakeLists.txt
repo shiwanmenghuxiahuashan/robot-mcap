@@ -56,3 +56,8 @@ if(BUILD_TESTING)
             "$<TARGET_FILE:robot_mcap_test_bad_plugin>")
   set_tests_properties(plugin_runtime PROPERTIES TIMEOUT 120)
 endif()
+
+option(ROBOT_MCAP_WITH_ROS2 "Build the ROS 2 Jazzy adapter and tests" OFF)
+if(ROBOT_MCAP_WITH_ROS2)
+  add_subdirectory(plugins/ros2_jazzy)
+endif()

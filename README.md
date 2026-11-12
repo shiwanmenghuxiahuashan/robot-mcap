@@ -105,6 +105,44 @@ runtime.stop();
 - Service IDs are derived from `service_id<T>()`; provide the interface type
   explicitly, for example `context.provide<IMessageSink>(sink)`.
 
+## ROS 2 Jazzy adapter
+
+The core remains independent of ROS. In a Jazzy environment, build the optional adapter:
+
+```sh
+source /opt/ros/jazzy/setup.bash
+cmake -S . -B build/jazzy -DBUILD_TESTING=ON -DROBOT_MCAP_WITH_ROS2=ON \
+  -DFETCHCONTENT_SOURCE_DIR_FOXGLOVE_MCAP=<pinned mcap checkout>
+cmake --build build/jazzy
+ctest --test-dir build/jazzy -R '^ros2_record_replay$' --output-on-failure
+```
+
+`plugins/ros2_jazzy` builds a native `ros2_source` module and a host-side adapter:
+
+- Selected topics are discovered and received as serialized CDR through generic
+  subscriptions. Per-topic QoS overrides, required-topic/type-support prechecks,
+  allowed late appearance, type-conflict rejection and queue-full diagnostics are
+  supported.
+- Channel schemas come from installed `.msg`/`.idl` definitions with recursive
+  dependency expansion.
+- After `PluginRuntime::stop()`, `Ros2MetadataWriter` reads the finalized MCAP, writes
+  `metadata.yaml` with the Jazzy `rosbag2_storage` metadata API, and atomically
+  rewrites `manifest.json`'s `ros2_replay` state and diagnostics. The test runs
+  `ros2 bag info`, `ros2 bag play` and an independent subscriber that checks count,
+  type and payload.
+
+This is an adapter-only implementation: the MCAP header profile stays empty and
+per-channel QoS/type-hash metadata lives in `metadata.yaml` rather than MCAP Channel
+metadata; the manifest `ros2_replay` fields are filled after the core publishes the
+manifest. If a consumer requires the MCAP ROS 2 profile or embedded channel metadata,
+add the corresponding minimal core fields.
+
+## Research
+
+- [ROS 2 writer and rosbag2 comparison](docs/research/2026-11-11-ros2-writer-comparison.md):
+  layering, capability differences, the adapter-only gaps (MCAP ROS 2 profile, Channel
+  QoS/type hash, embedded rosbag2 metadata), and the prioritized improvement backlog.
+
 ## Tests
 
 The CTest suite covers:
@@ -121,6 +159,10 @@ The CTest suite covers:
   registration/closure, sink startup failure, source-before-flow ordering, a final
   message submitted during finalize, core-only recording through the flow, and native
   module load/lifetime/two-instance isolation.
+- `ros2_record_replay` (Jazzy builds only): schema dependency expansion, missing
+  required topic, late and unselected topics, type conflict diagnostics, default and
+  best-effort QoS, metadata generation failure, and real `ros2 bag info`/`play` with
+  an independent subscriber checking payloads.
 
 Sanitizer builds used during development (run with an absolute test directory):
 
