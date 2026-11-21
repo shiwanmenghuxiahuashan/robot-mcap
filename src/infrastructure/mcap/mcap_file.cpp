@@ -2,7 +2,7 @@
 
 #include "robot_mcap/io.hpp"
 
-#include "text.hpp"
+#include "shared_kernel/text.hpp"
 
 #include <mcap/writer.hpp>
 

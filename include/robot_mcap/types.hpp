@@ -13,6 +13,11 @@ class FileSystem;
 
 using ChannelId = std::uint16_t;
 
+// How the session files are made durable before the manifest is published.
+// Defined here, not in recorder.hpp, so session_format can describe the
+// recording result without including the recorder API.
+enum class DurabilityMode { Close, Sync };
+
 struct Status {
   std::string operation;
   std::filesystem::path path;

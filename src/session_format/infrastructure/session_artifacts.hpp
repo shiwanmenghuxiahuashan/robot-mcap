@@ -1,12 +1,11 @@
 #pragma once
 
 #include "robot_mcap/io.hpp"
-#include "robot_mcap/recorder.hpp"
 #include "robot_mcap/types.hpp"
+#include "session_format/domain/manifest.hpp"
 
 #include <cstdint>
 #include <filesystem>
-#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -14,63 +13,16 @@
 
 namespace robot_mcap::detail {
 
-struct Diagnostic {
-  std::string code;
-  std::string severity = "error";
-  std::optional<std::string> topic;
-  std::optional<std::uint64_t> log_time_ns;
-  std::string detail;
-  std::string action;
-};
-
-struct FileFacts {
-  std::filesystem::path path;
-  bool finalized = false;
-  bool present = true;
-  std::optional<std::uint64_t> bytes;
-  std::optional<std::uint64_t> message_count;
-  std::optional<std::uint64_t> first_log_time_ns;
-  std::optional<std::uint64_t> last_log_time_ns;
-};
-
-struct TimingFacts {
-  bool present = false;
-  std::filesystem::path path;
-  std::uint64_t row_count = 0;
-  std::optional<std::string> sha256;
-  bool sha256_ok = true;
-  bool finalized = false;
-};
-
-struct Statistics {
-  std::uint64_t accepted = 0;
-  std::uint64_t rejected = 0;
-  std::uint64_t writer_processed = 0;
-  std::optional<std::uint64_t> finalized_messages;
-};
-
-struct ManifestInput {
-  std::string session_id;
-  bool session_finalized = false;
-  FileFacts data;
-  TimingFacts timing;
-  std::vector<std::pair<ChannelId, ChannelSpec>> channels;
-  Statistics statistics;
-  DurabilityMode durability_mode = DurabilityMode::Close;
-  std::vector<Diagnostic> diagnostics;
-};
-
-struct PublishResult {
-  bool manifest_published = false;
-  Status error;
-};
-
+// Owns one session directory and the publication order of its files. Text
+// rendering lives in documents.cpp; this class only creates, syncs and renames
+// artifacts, so the format can be tested without a recorder and the recorder
+// can be tested without inspecting JSON.
 class SessionArtifacts {
 public:
   SessionArtifacts(std::shared_ptr<FileSystem> file_system,
                    std::filesystem::path session_directory, std::string session_id,
                    FileOptions file_options, std::uint64_t queue_byte_limit,
-                   DurabilityMode durability_mode);
+                   DurabilityMode durability_mode, std::string writer_version);
 
   const std::filesystem::path& directory() const noexcept { return directory_; }
   const std::filesystem::path& data_partial_path() const noexcept { return data_partial_; }
@@ -98,9 +50,6 @@ public:
   PublishResult publish_manifest(const ManifestInput& input) noexcept;
 
 private:
-  std::string config_json() const;
-  std::string manifest_json(const ManifestInput& input) const;
-  std::string relative_name(const std::filesystem::path& path) const;
   Status sync_file_checked(const std::filesystem::path& path) noexcept;
   Status sync_directory_checked(const std::filesystem::path& path) noexcept;
 
@@ -118,6 +67,7 @@ private:
   FileOptions file_options_;
   std::uint64_t queue_byte_limit_;
   DurabilityMode durability_mode_;
+  std::string writer_version_;
 
   std::unique_ptr<OutputSink> timing_sink_;
   bool timing_created_ = false;

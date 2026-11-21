@@ -24,8 +24,6 @@ struct OwnedMessage {
   std::vector<std::byte> data;
 };
 
-enum class DurabilityMode { Close, Sync };
-
 struct RecorderOptions {
   // The session directory is created as parent_directory / session_id.
   std::filesystem::path parent_directory;

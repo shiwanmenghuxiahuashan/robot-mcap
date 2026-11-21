@@ -1,4 +1,4 @@
-#include "sha256.hpp"
+#include "shared_kernel/sha256.hpp"
 
 #include <algorithm>
 #include <cstring>

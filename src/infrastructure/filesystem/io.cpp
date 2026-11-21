@@ -1,6 +1,6 @@
 #include "robot_mcap/io.hpp"
 
-#include "sha256.hpp"
+#include "shared_kernel/sha256.hpp"
 
 #include <cerrno>
 #include <cstdio>
@@ -22,16 +22,16 @@
 namespace robot_mcap {
 namespace {
 
-std::FILE* open_read(const std::filesystem::path& path) {
+std::FILE *open_read(const std::filesystem::path &path) {
 #ifdef _WIN32
-  std::FILE* file = nullptr;
+  std::FILE *file = nullptr;
   const int error = _wfopen_s(&file, path.c_str(), L"rb");
   if (!file) {
     throw std::system_error(error, std::generic_category(), "open input");
   }
   return file;
 #else
-  std::FILE* file = std::fopen(path.c_str(), "rb");
+  std::FILE *file = std::fopen(path.c_str(), "rb");
   if (!file) {
     throw std::system_error(errno, std::generic_category(), "open input");
   }
@@ -44,7 +44,7 @@ public:
   NativeOutputSink() = default;
   ~NativeOutputSink() override { abandon(); }
 
-  void open_exclusive(const std::filesystem::path& path) {
+  void open_exclusive(const std::filesystem::path &path) {
 #ifdef _WIN32
     const int error = _wfopen_s(&file_, path.c_str(), L"wbx");
 #else
@@ -56,7 +56,7 @@ public:
     }
   }
 
-  void write(const std::byte* data, std::size_t size) override {
+  void write(const std::byte *data, std::size_t size) override {
     if (size == 0) {
       return;
     }
@@ -73,7 +73,7 @@ public:
   }
 
   void close() override {
-    std::FILE* file = std::exchange(file_, nullptr);
+    std::FILE *file = std::exchange(file_, nullptr);
     if (file && std::fclose(file) != 0) {
       throw std::system_error(errno, std::generic_category(), "close output");
     }
@@ -88,19 +88,20 @@ public:
   std::uint64_t size() const override { return size_; }
 
 private:
-  std::FILE* file_ = nullptr;
+  std::FILE *file_ = nullptr;
   std::uint64_t size_ = 0;
 };
 
 class NativeFileSystem final : public FileSystem {
 public:
-  std::unique_ptr<OutputSink> create_exclusive(const std::filesystem::path& path) override {
+  std::unique_ptr<OutputSink>
+  create_exclusive(const std::filesystem::path &path) override {
     auto sink = std::make_unique<NativeOutputSink>();
     sink->open_exclusive(path);
     return sink;
   }
 
-  void sync_file(const std::filesystem::path& path) override {
+  void sync_file(const std::filesystem::path &path) override {
 #ifdef _WIN32
     const int descriptor = _wopen(path.c_str(), _O_RDWR | _O_BINARY);
     if (descriptor < 0) {
@@ -126,17 +127,18 @@ public:
 #endif
   }
 
-  void sync_directory(const std::filesystem::path& path) override {
+  void sync_directory(const std::filesystem::path &path) override {
 #ifdef _WIN32
     // FlushFileBuffers on a directory handle is the closest Windows equivalent.
-    // Some filesystems reject it; surface that as a durability failure rather than
-    // silently reporting success.
-    const HANDLE handle =
-        CreateFileW(path.c_str(), FILE_READ_ATTRIBUTES,
-                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
-                    OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+    // Some filesystems reject it; surface that as a durability failure rather
+    // than silently reporting success.
+    const HANDLE handle = CreateFileW(
+        path.c_str(), FILE_READ_ATTRIBUTES,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+        OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
     if (handle == INVALID_HANDLE_VALUE) {
-      throw std::system_error(static_cast<int>(GetLastError()), std::system_category(),
+      throw std::system_error(static_cast<int>(GetLastError()),
+                              std::system_category(),
                               "open directory for sync");
     }
     if (!FlushFileBuffers(handle)) {
@@ -147,9 +149,11 @@ public:
     }
     CloseHandle(handle);
 #else
-    const int descriptor = ::open(path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    const int descriptor =
+        ::open(path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
     if (descriptor < 0) {
-      throw std::system_error(errno, std::generic_category(), "open directory for sync");
+      throw std::system_error(errno, std::generic_category(),
+                              "open directory for sync");
     }
     const int result = ::fsync(descriptor);
     const int error = errno;
@@ -160,21 +164,22 @@ public:
 #endif
   }
 
-  void rename(const std::filesystem::path& from, const std::filesystem::path& to) override {
+  void rename(const std::filesystem::path &from,
+              const std::filesystem::path &to) override {
     std::filesystem::rename(from, to);
   }
 
-  void remove(const std::filesystem::path& path) noexcept override {
+  void remove(const std::filesystem::path &path) noexcept override {
     std::error_code ignored;
     std::filesystem::remove(path, ignored);
   }
 
-  std::uint64_t file_size(const std::filesystem::path& path) override {
+  std::uint64_t file_size(const std::filesystem::path &path) override {
     return std::filesystem::file_size(path);
   }
 
-  std::string file_sha256(const std::filesystem::path& path) override {
-    std::FILE* file = open_read(path);
+  std::string file_sha256(const std::filesystem::path &path) override {
+    std::FILE *file = open_read(path);
     detail::Sha256 digest;
     std::vector<std::byte> buffer(64 * 1024);
     try {
@@ -185,7 +190,8 @@ public:
         }
         if (read < buffer.size()) {
           if (std::ferror(file) != 0) {
-            throw std::system_error(errno, std::generic_category(), "read input");
+            throw std::system_error(errno, std::generic_category(),
+                                    "read input");
           }
           break;
         }
@@ -200,28 +206,29 @@ public:
     return digest.finalize();
   }
 
-  void create_directories(const std::filesystem::path& path) override {
+  void create_directories(const std::filesystem::path &path) override {
     std::filesystem::create_directories(path);
   }
 
-  bool create_directory_exclusive(const std::filesystem::path& path) override {
+  bool create_directory_exclusive(const std::filesystem::path &path) override {
     return std::filesystem::create_directory(path);
   }
 };
 
-}  // namespace
+} // namespace
 
 std::shared_ptr<FileSystem> native_file_system() {
   static const auto instance = std::make_shared<NativeFileSystem>();
   return instance;
 }
 
-void write_file(FileSystem& file_system, const std::filesystem::path& path,
+void write_file(FileSystem &file_system, const std::filesystem::path &path,
                 std::string_view bytes) {
   auto sink = file_system.create_exclusive(path);
   try {
     if (!bytes.empty()) {
-      sink->write(reinterpret_cast<const std::byte*>(bytes.data()), bytes.size());
+      sink->write(reinterpret_cast<const std::byte *>(bytes.data()),
+                  bytes.size());
     }
     sink->close();
   } catch (...) {
@@ -235,4 +242,4 @@ std::string sha256_hex(std::string_view data) {
   return detail::sha256_hex(data);
 }
 
-}  // namespace robot_mcap
+} // namespace robot_mcap

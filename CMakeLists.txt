@@ -6,19 +6,42 @@ include(cmake/Dependencies.cmake)
 
 find_package(Threads REQUIRED)
 
+# 源码按限界上下文分组，上下文内部再按 DDD 层分组：domain 不依赖其他层，
+# application 负责用例编排，infrastructure 提供 I/O 和平台机制。shared_kernel
+# 只依赖标准库。私有头通过 PRIVATE src 根目录包含。
 add_library(robot_mcap STATIC
-  src/io.cpp
-  src/mcap_file.cpp
-  src/mcap_vendor.cpp
-  src/plugin_runtime.cpp
-  src/recorder.cpp
-  src/recording_flow.cpp
-  src/session_artifacts.cpp
-  src/sha256.cpp
-  src/text.cpp
+  # shared_kernel
+  src/shared_kernel/sha256.cpp
+  src/shared_kernel/text.cpp
+
+  # infrastructure
+  src/infrastructure/filesystem/io.cpp
+  src/infrastructure/mcap/mcap_file.cpp
+  src/infrastructure/mcap/mcap_vendor.cpp
+
+  # session_format
+  src/session_format/domain/documents.cpp
+  src/session_format/infrastructure/session_artifacts.cpp
+
+  # plugin_runtime
+  src/plugin_runtime/domain/dependency_resolution.cpp
+  src/plugin_runtime/domain/descriptor_rules.cpp
+  src/plugin_runtime/application/plugin_runtime.cpp
+  src/plugin_runtime/application/scope.cpp
+  src/plugin_runtime/application/context.cpp
+  src/plugin_runtime/infrastructure/service_registry.cpp
+  src/plugin_runtime/infrastructure/native_module.cpp
+
+  # recording
+  src/recording/domain/message_rules.cpp
+  src/recording/application/recorder.cpp
+  src/recording/application/recorder_writer.cpp
+  src/recording/application/recording_flow.cpp
+  src/recording/application/prechecks.cpp
+  src/recording/adapters/recording_flow_plugin.cpp
 )
 target_compile_features(robot_mcap PUBLIC cxx_std_17)
-target_include_directories(robot_mcap PUBLIC include)
+target_include_directories(robot_mcap PUBLIC include PRIVATE src)
 set_target_properties(robot_mcap PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(robot_mcap PRIVATE
   robot_mcap_upstream Threads::Threads ${CMAKE_DL_LIBS})
